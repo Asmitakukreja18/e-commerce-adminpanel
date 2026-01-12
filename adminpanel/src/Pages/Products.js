@@ -18,42 +18,29 @@ import {
 
 import { Add, Edit, Delete } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-
-const products = [
-  {
-    name: "Fresh Tomatoes",
-    sku: "VEG001",
-    img: "https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=100",
-    category: "Vegetables",
-    price: "₹40/500g",
-    stock: "In Stock (150)",
-    stockColor: "success",
-    active: true
-  },
-  {
-    name: "Fresh Red Apples",
-    sku: "FRT001",
-    img: "https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=100",
-    category: "Fruits",
-    price: "₹120/1kg",
-    stock: "Low Stock (15)",
-    stockColor: "warning",
-    active: true
-  },
-  {
-    name: "Red Onions",
-    sku: "VEG002",
-    img: "https://images.unsplash.com/photo-1550258987-190a2d41a8ba?w=100",
-    category: "Vegetables",
-    price: "₹35/1kg",
-    stock: "Out of Stock",
-    stockColor: "error",
-    active: false
-  }
-];
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProducts, deleteProduct } from "../Store/ProductSlice";
 
 export default function ProductManagement() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const { products, loading } = useSelector((state) => state.products);
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
+
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      dispatch(deleteProduct(id));
+    }
+  };
+  
+  const handleEdit = (id) => {
+    navigate(`/products/edit/${id}`);
+  };
 
   return (
     <Box p={3}>
@@ -85,13 +72,10 @@ export default function ProductManagement() {
       </Box>
 
       <Paper sx={{ borderRadius: 3, border: "1px solid #eee" }}>
-      
         <Box p={3} display="flex" gap={2}>
           <TextField size="small" placeholder="Search products..." />
           <Select size="small" defaultValue="">
             <MenuItem value="">All Categories</MenuItem>
-            <MenuItem>Vegetables</MenuItem>
-            <MenuItem>Fruits</MenuItem>
           </Select>
           <Select size="small" defaultValue="">
             <MenuItem value="">All Status</MenuItem>
@@ -103,7 +87,7 @@ export default function ProductManagement() {
         <Table>
           <TableHead sx={{ bgcolor: "#F9FAFB" }}>
             <TableRow>
-              {["Product", "Category", "Price", "Stock", "Status", "Actions"].map(h => (
+              {["Product", "Price", "Stock", "Status", "Actions"].map((h) => (
                 <TableCell key={h} sx={{ fontSize: 12, fontWeight: 700 }}>
                   {h}
                 </TableCell>
@@ -112,57 +96,79 @@ export default function ProductManagement() {
           </TableHead>
 
           <TableBody>
-            {products.map((p, i) => (
-              <TableRow key={i} hover>
-                <TableCell>
-                  <Box display="flex" gap={2} alignItems="center">
-                    <img
-                      src={p.img}
-                      alt={p.name}
-                      style={{ width: 48, height: 48, borderRadius: 8 }}
-                    />
-                    <Box>
-                      <Typography fontWeight={600}>{p.name}</Typography>
-                      <Typography fontSize={12} color="text.secondary">
-                        SKU: {p.sku}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </TableCell>
+            {!loading &&
+              products.map((p) => {
+                const totalStock = p.variants?.reduce(
+                  (sum, v) => sum + v.stock,
+                  0
+                );
 
-                <TableCell>{p.category}</TableCell>
-                <TableCell fontWeight={600}>{p.price}</TableCell>
+                return (
+                  <TableRow key={p._id} hover>
+              
+                    <TableCell>
+                      <Box display="flex" alignItems="center" gap={2}>
+                        <Box
+                          component="img"
+                          src={p.images?.[0] || "https://via.placeholder.com/40"}
+                          sx={{ width: 40, height: 40, borderRadius: 2 }}
+                        />
+                        <Box>
+                          <Typography fontWeight={600}>{p.name}</Typography>
+                          <Typography fontSize={12} color="text.secondary">
+                            SKU: {p.sku}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
 
-                <TableCell>
-                  <Chip
-                    label={p.stock}
-                    color={p.stockColor}
-                    size="small"
-                    sx={{ fontWeight: 600 }}
-                  />
-                </TableCell>
+                
+                    <TableCell fontWeight={600}>
+                      ₹{p.variants?.[0]?.price} / {p.variants?.[0]?.unit}
+                    </TableCell>
 
-                <TableCell>
-                  <Switch checked={p.active} color="success" />
-                </TableCell>
+                  
+                    <TableCell>
+                      <Chip
+                        label={
+                          totalStock > 0
+                            ? `In Stock (${totalStock})`
+                            : "Out of Stock"
+                        }
+                        color={totalStock > 0 ? "success" : "error"}
+                        size="small"
+                      />
+                    </TableCell>
 
-                <TableCell>
-                  <IconButton color="primary"><Edit /></IconButton>
-                  <IconButton color="error"><Delete /></IconButton>
+                   
+                    <TableCell>
+                      <Switch checked={p.isActive} color="success" />
+                    </TableCell>
+
+                    <TableCell>
+                      <IconButton color="primary" onClick={() => handleEdit(p._id)}>
+                        <Edit />
+                      </IconButton>
+                      <IconButton 
+                        color="error"
+                        onClick={() => handleDelete(p._id)}
+                      >
+                        <Delete />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+
+            {!loading && products.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  No products found
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
-
-        <Box p={2} display="flex" justifyContent="space-between">
-          <Typography fontSize={14}>Showing 1 to 5 of 287 entries</Typography>
-          <Box display="flex" gap={1}>
-            <Button size="small" variant="outlined">Previous</Button>
-            <Button size="small" variant="contained" sx={{ bgcolor: "#16A34A" }}>1</Button>
-            <Button size="small" variant="outlined">Next</Button>
-          </Box>
-        </Box>
       </Paper>
     </Box>
   );

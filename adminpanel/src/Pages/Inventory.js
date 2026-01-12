@@ -12,7 +12,13 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel
 } from "@mui/material";
 
 import {
@@ -22,64 +28,119 @@ import {
   Cancel
 } from "@mui/icons-material";
 
-const stats = [
-  {
-    label: "In Stock Products",
-    value: 245,
-    icon: <CheckCircle />,
-    bg: "#DCFCE7",
-    color: "#16A34A"
-  },
-  {
-    label: "Low Stock Items",
-    value: 23,
-    icon: <Error />,
-    bg: "#FEF9C3",
-    color: "#CA8A04"
-  },
-  {
-    label: "Out of Stock",
-    value: 19,
-    icon: <Cancel />,
-    bg: "#FEE2E2",
-    color: "#DC2626"
-  }
-];
-
-const inventory = [
-  {
-    name: "Fresh Tomatoes",
-    sku: "VEG001",
-    img: "https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=100",
-    category: "Vegetables",
-    variant: "500g",
-    stock: "150 units",
-    status: "In Stock",
-    color: "success"
-  },
-  {
-    name: "Fresh Red Apples",
-    sku: "FRT001",
-    img: "https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=100",
-    category: "Fruits",
-    variant: "1kg",
-    stock: "15 units",
-    status: "Low Stock",
-    color: "warning"
-  },
-  {
-    name: "Red Onions",
-    sku: "VEG002",
-    img: "https://images.unsplash.com/photo-1550258987-190a2d41a8ba?w=100",
-    category: "Vegetables",
-    variant: "1kg",
-    stock: "0 units",
-    status: "Out of Stock",
-    color: "error"
-  }
-];
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProducts, addStockEntry } from "../Store/ProductSlice";
 
 export default function InventoryManagement() {
+  const dispatch = useDispatch();
+  const { products, loading } = useSelector((state) => state.products);
+
+  const [open, setOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [stockData, setStockData] = useState({
+    quantity: "",
+    type: "IN",
+    reason: ""
+  });
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
+
+  const inventoryItems = products.flatMap(product => 
+    product.variants.map(variant => ({
+      productId: product._id,
+      name: product.name,
+      sku: product.sku,
+      img: product.images?.[0] || "",
+      category: product.categoryId?.name || "Uncategorized",
+      variant: variant.unit,
+      stock: variant.stock,
+      price: variant.price
+    }))
+  );
+
+
+  const inStock = inventoryItems.filter(i => i.stock > 10).length;
+  const lowStock = inventoryItems.filter(i => i.stock > 0 && i.stock <= 10).length;
+  const outOfStock = inventoryItems.filter(i => i.stock === 0).length;
+
+  const stats = [
+    {
+      label: "In Stock Products",
+      value: inStock,
+      icon: <CheckCircle />,
+      bg: "#DCFCE7",
+      color: "#16A34A"
+    },
+    {
+      label: "Low Stock Items",
+      value: lowStock,
+      icon: <Error />,
+      bg: "#FEF9C3",
+      color: "#CA8A04"
+    },
+    {
+      label: "Out of Stock",
+      value: outOfStock,
+      icon: <Cancel />,
+      bg: "#FEE2E2",
+      color: "#DC2626"
+    }
+  ];
+
+  const handleUpdateClick = (item) => {
+    setSelectedItem(item);
+    setStockData({ quantity: "", type: "IN", reason: "" });
+    setOpen(true);
+  };
+
+  const handleSaveStock = async () => {
+    if (!selectedItem || !stockData.quantity) return;
+
+    const result = await dispatch(
+      addStockEntry({
+        productId: selectedItem.productId,
+        variant: selectedItem.variant,
+        quantity: Number(stockData.quantity),
+        type: stockData.type,
+        reason: stockData.reason || "Manual Update"
+      })
+    );
+
+    if (result.meta.requestStatus === "fulfilled") {
+      setOpen(false);
+      dispatch(fetchProducts()); 
+    }
+  };
+
+  const handleExport = () => {
+    const headers = ["Product,SKU,Category,Variant,Stock,Price,Status"];
+    const rows = inventoryItems.map(item => {
+      const status = item.stock === 0 ? "Out of Stock" : item.stock <= 10 ? "Low Stock" : "In Stock";
+      return [
+        `"${item.name}"`,
+        item.sku,
+        item.category,
+        item.variant,
+        item.stock,
+        item.price,
+        status
+      ].join(",");
+    });
+
+    const csvContent = [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `inventory_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" mb={4}>
@@ -88,76 +149,65 @@ export default function InventoryManagement() {
             Inventory Management
           </Typography>
           <Typography color="text.secondary">
-            Monitor and manage stock levels
+            Track stock levels and manage inventory
           </Typography>
         </Box>
 
         <Button
+          variant="outlined"
           startIcon={<Download />}
-          sx={{
-            bgcolor: "#16A34A",
-            color: "#fff",
-            px: 3,
-            py: 1.5,
-            borderRadius: "12px",
-            fontWeight: 600,
-            "&:hover": { bgcolor: "#15803D" }
-          }}
+          onClick={handleExport}
         >
-          Download Report
+          Export Report
         </Button>
       </Box>
+
       <Grid container spacing={3} mb={4}>
-        {stats.map((s, i) => (
-          <Grid item xs={12} md={4} key={i}>
+        {stats.map((stat, index) => (
+          <Grid item xs={12} md={4} key={index}>
             <Paper
               sx={{
                 p: 3,
-                borderRadius: "16px",
-                border: "1px solid #eee"
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                bgcolor: stat.bg,
+                color: stat.color,
+                borderRadius: 3
               }}
             >
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
-                  bgcolor: s.bg,
-                  color: s.color,
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  mb: 2
+                  p: 1.5,
+                  bgcolor: "white",
+                  borderRadius: "50%",
+                  display: "flex"
                 }}
               >
-                {s.icon}
+                {stat.icon}
               </Box>
-
-              <Typography fontSize={14} color="text.secondary">
-                {s.label}
-              </Typography>
-              <Typography fontSize={28} fontWeight={700}>
-                {s.value}
-              </Typography>
+              <Box>
+                <Typography fontWeight={600} fontSize={14}>
+                  {stat.label}
+                </Typography>
+                <Typography fontWeight={700} fontSize={24}>
+                  {stat.value}
+                </Typography>
+              </Box>
             </Paper>
           </Grid>
         ))}
       </Grid>
 
-      <Paper sx={{ borderRadius: 3, border: "1px solid #eee" }}>
-       
+      <Paper sx={{ borderRadius: 3, overflow: "hidden" }}>
         <Box p={3} display="flex" gap={2}>
-          <TextField size="small" placeholder="Search inventory..." />
-          <Select size="small" defaultValue="">
-            <MenuItem value="">All Categories</MenuItem>
-            <MenuItem>Vegetables</MenuItem>
-            <MenuItem>Fruits</MenuItem>
-          </Select>
-          <Select size="small" defaultValue="">
-            <MenuItem value="">All Stock Status</MenuItem>
-            <MenuItem>In Stock</MenuItem>
-            <MenuItem>Low Stock</MenuItem>
-            <MenuItem>Out of Stock</MenuItem>
+          <TextField
+            placeholder="Search inventory..."
+            size="small"
+            sx={{ width: 300 }}
+          />
+          <Select size="small" defaultValue="all" sx={{ width: 160 }}>
+            <MenuItem value="all">All Categories</MenuItem>
           </Select>
         </Box>
 
@@ -166,15 +216,21 @@ export default function InventoryManagement() {
             <TableRow>
               {[
                 "Product",
+                "SKU",
                 "Category",
                 "Variant",
                 "Current Stock",
                 "Status",
-                "Actions"
-              ].map(h => (
+                "Action"
+              ].map((h) => (
                 <TableCell
                   key={h}
-                  sx={{ fontSize: 12, fontWeight: 700 }}
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#6B7280",
+                    textTransform: "uppercase"
+                  }}
                 >
                   {h}
                 </TableCell>
@@ -183,65 +239,60 @@ export default function InventoryManagement() {
           </TableHead>
 
           <TableBody>
-            {inventory.map((item, i) => (
-              <TableRow key={i} hover>
+            {inventoryItems.map((item, index) => (
+              <TableRow key={index} hover>
                 <TableCell>
-                  <Box display="flex" gap={2} alignItems="center">
-                    <img
-                      src={item.img}
-                      alt={item.name}
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 8,
-                        objectFit: "cover"
-                      }}
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                      component="img"
+                      src={item.img || "https://via.placeholder.com/40"}
+                      sx={{ width: 40, height: 40, borderRadius: 2 }}
                     />
                     <Box>
-                      <Typography fontWeight={600}>
+                      <Typography fontWeight={600} fontSize={14}>
                         {item.name}
                       </Typography>
-                      <Typography fontSize={12} color="text.secondary">
-                        SKU: {item.sku}
+                      <Typography fontSize={13} color="text.secondary">
+                        {item.variant} • {item.category} {item.subCategory && `> ${item.subCategory}`}
                       </Typography>
                     </Box>
                   </Box>
                 </TableCell>
-
+                <TableCell>{item.sku}</TableCell>
                 <TableCell>{item.category}</TableCell>
-                <TableCell>{item.variant}</TableCell>
-
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    color:
-                      item.color === "error"
-                        ? "#DC2626"
-                        : item.color === "warning"
-                        ? "#CA8A04"
-                        : "#111827"
-                  }}
-                >
-                  {item.stock}
-                </TableCell>
-
                 <TableCell>
-                  <Chip
-                    label={item.status}
-                    color={item.color}
-                    size="small"
-                    sx={{ fontWeight: 600 }}
-                  />
+                  <Chip label={item.variant} size="small" />
                 </TableCell>
-
+                <TableCell fontWeight={700}>{item.stock}</TableCell>
+                <TableCell>
+                  {item.stock === 0 ? (
+                    <Chip
+                      label="Out of Stock"
+                      color="error"
+                      size="small"
+                      variant="outlined"
+                    />
+                  ) : item.stock <= 10 ? (
+                    <Chip
+                      label="Low Stock"
+                      color="warning"
+                      size="small"
+                      variant="outlined"
+                    />
+                  ) : (
+                    <Chip
+                      label="In Stock"
+                      color="success"
+                      size="small"
+                      variant="outlined"
+                    />
+                  )}
+                </TableCell>
                 <TableCell>
                   <Button
                     size="small"
-                    sx={{
-                      color: "#2563EB",
-                      fontWeight: 600,
-                      textTransform: "none"
-                    }}
+                    variant="contained"
+                    onClick={() => handleUpdateClick(item)}
                   >
                     Update Stock
                   </Button>
@@ -250,40 +301,64 @@ export default function InventoryManagement() {
             ))}
           </TableBody>
         </Table>
-
-        <Box
-          p={2}
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography fontSize={14} color="text.secondary">
-            Showing 1 to 5 of 287 entries
-          </Typography>
-
-          <Box display="flex" gap={1}>
-            <Button size="small" variant="outlined">
-              Previous
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              sx={{ bgcolor: "#16A34A" }}
-            >
-              1
-            </Button>
-            <Button size="small" variant="outlined">
-              2
-            </Button>
-            <Button size="small" variant="outlined">
-              3
-            </Button>
-            <Button size="small" variant="outlined">
-              Next
-            </Button>
-          </Box>
-        </Box>
       </Paper>
+
+     
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Update Stock</DialogTitle>
+        <DialogContent>
+          <Box mt={1} display="flex" flexDirection="column" gap={2}>
+            <Typography variant="subtitle2" color="text.secondary">
+              {selectedItem?.name} ({selectedItem?.variant})
+            </Typography>
+
+            <FormControl fullWidth>
+              <InputLabel>Update Type</InputLabel>
+              <Select
+                value={stockData.type}
+                label="Update Type"
+                onChange={(e) =>
+                  setStockData({ ...stockData, type: e.target.value })
+                }
+              >
+                <MenuItem value="IN">Stock In (+)</MenuItem>
+                <MenuItem value="OUT">Stock Out (-)</MenuItem>
+              </Select>
+            </FormControl>
+
+            <TextField
+              label="Quantity"
+              type="number"
+              fullWidth
+              value={stockData.quantity}
+              onChange={(e) =>
+                setStockData({ ...stockData, quantity: e.target.value })
+              }
+            />
+
+            <TextField
+              label="Reason (Optional)"
+              fullWidth
+              multiline
+              rows={2}
+              value={stockData.reason}
+              onChange={(e) =>
+                setStockData({ ...stockData, reason: e.target.value })
+              }
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveStock}
+            disabled={!stockData.quantity}
+          >
+            Save Update
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

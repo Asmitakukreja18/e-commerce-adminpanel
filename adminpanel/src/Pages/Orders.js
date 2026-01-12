@@ -12,44 +12,37 @@ import {
   TableBody,
   Button
 } from "@mui/material";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchOrders, updateOrderStatus } from "../Store/OrderSlice";
 
-const orders = [
-  {
-    id: "#SGM2024001",
-    name: "Rajesh Kumar",
-    phone: "+91 98765 43210",
-    time: "Today, 10:30 AM",
-    items: "3 items",
-    amount: "₹340",
-    status: "Delivered",
-    color: "#DCFCE7",
-    text: "#16A34A"
-  },
-  {
-    id: "#SGM2024002",
-    name: "Priya Sharma",
-    phone: "+91 98765 43211",
-    time: "Today, 11:15 AM",
-    items: "5 items",
-    amount: "₹520",
-    status: "Processing",
-    color: "#DBEAFE",
-    text: "#2563EB"
-  },
-  {
-    id: "#SGM2024003",
-    name: "Amit Patel",
-    phone: "+91 98765 43212",
-    time: "Today, 12:00 PM",
-    items: "2 items",
-    amount: "₹285",
-    status: "Pending",
-    color: "#FEF9C3",
-    text: "#CA8A04"
+const getStatusColor = (status) => {
+  switch (status) {
+    case "Delivered":
+      return { bg: "#DCFCE7", text: "#16A34A" };
+    case "Processing":
+      return { bg: "#DBEAFE", text: "#2563EB" };
+    case "Pending":
+      return { bg: "#FEF9C3", text: "#CA8A04" };
+    case "Cancelled":
+      return { bg: "#FEE2E2", text: "#DC2626" };
+    default:
+      return { bg: "#F3F4F6", text: "#374151" };
   }
-];
+};
 
 export default function OrdersManagement() {
+  const dispatch = useDispatch();
+  const { orders, loading } = useSelector((state) => state.orders);
+
+  useEffect(() => {
+    dispatch(fetchOrders());
+  }, [dispatch]);
+
+  const handleStatusChange = (id, newStatus) => {
+    dispatch(updateOrderStatus({ id, status: newStatus }));
+  };
+
   return (
     <Box p={3}>
       <Box mb={4}>
@@ -100,33 +93,40 @@ export default function OrdersManagement() {
           </TableHead>
 
           <TableBody>
-            {orders.map((o, i) => (
-              <TableRow key={i} hover>
+            {loading ? (
+               <TableRow>
+                 <TableCell colSpan={7} align="center">Loading...</TableCell>
+               </TableRow>
+            ) : orders.map((o) => {
+              const { bg, text } = getStatusColor(o.status);
+              return (
+              <TableRow key={o._id} hover>
                 <TableCell sx={{ fontWeight: 600 }}>
-                  {o.id}
+                  #{o._id.slice(-6).toUpperCase()}
                 </TableCell>
 
                 <TableCell>
-                  <Typography fontWeight={600}>{o.name}</Typography>
+                  <Typography fontWeight={600}>{o.customer.name}</Typography>
                   <Typography fontSize={12} color="text.secondary">
-                    {o.phone}
+                    {o.customer.phone}
                   </Typography>
                 </TableCell>
 
-                <TableCell>{o.time}</TableCell>
-                <TableCell>{o.items}</TableCell>
+                <TableCell>{new Date(o.createdAt).toLocaleString()}</TableCell>
+                <TableCell>{o.items.length} items</TableCell>
 
                 <TableCell sx={{ fontWeight: 600 }}>
-                  {o.amount}
+                  ₹{o.totalAmount}
                 </TableCell>
 
                 <TableCell>
                   <Select
                     size="small"
-                    defaultValue={o.status}
+                    value={o.status}
+                    onChange={(e) => handleStatusChange(o._id, e.target.value)}
                     sx={{
-                      bgcolor: o.color,
-                      color: o.text,
+                      bgcolor: bg,
+                      color: text,
                       fontSize: 12,
                       fontWeight: 700,
                       borderRadius: "999px",
@@ -155,7 +155,7 @@ export default function OrdersManagement() {
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
 
@@ -166,30 +166,8 @@ export default function OrdersManagement() {
           alignItems="center"
         >
           <Typography fontSize={14} color="text.secondary">
-            Showing 1 to 5 of 1,248 entries
+            Showing {orders.length} entries
           </Typography>
-
-          <Box display="flex" gap={1}>
-            <Button size="small" variant="outlined">
-              Previous
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              sx={{ bgcolor: "#16A34A" }}
-            >
-              1
-            </Button>
-            <Button size="small" variant="outlined">
-              2
-            </Button>
-            <Button size="small" variant="outlined">
-              3
-            </Button>
-            <Button size="small" variant="outlined">
-              Next
-            </Button>
-          </Box>
         </Box>
       </Paper>
     </Box>

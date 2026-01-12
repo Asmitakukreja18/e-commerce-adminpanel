@@ -20,9 +20,10 @@ import {
   Logout,
   ShoppingBasket
 } from "@mui/icons-material";
-
+import { logout } from "../Store/AuthSlice";
 import { NavLink } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 const menuItems = [
   { label: "Dashboard", path: "/", icon: <Home /> },
   { label: "Categories", path: "/categories", icon: <Category /> },
@@ -34,6 +35,14 @@ const menuItems = [
 ];
 
 export default function Sidebar() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { admin } = useSelector((state) => state.auth);
+
+  const handleLogout = () => {
+    dispatch(logout()); 
+    navigate("/login", { replace: true }); 
+  };
   return (
     <Box
       sx={{
@@ -148,32 +157,30 @@ export default function Sidebar() {
               color: "#16a34a"
             }}
           >
-            A
+            {admin?.name?.charAt(0) || "A"}
           </Avatar>
 
           <Box sx={{ flex: 1 }}>
             <Typography fontSize={14} fontWeight={600}>
-              Admin User
+              {admin?.name || "Admin User"}
             </Typography>
             <Typography fontSize={12} color="text.secondary">
-              admin@smartgrocery.com
+              {admin?.email || "admin@smartgrocery.com"}
             </Typography>
           </Box>
 
-       <IconButton
-  component={NavLink}
-  to="/login"
-  sx={{
-    color: "#9ca3af",
-    "&:hover": {
-      color: "#dc2626",
-      bgcolor: "#fee2e2"
-    }
-  }}
->
-  <Logout />
-</IconButton>
-
+          <IconButton
+            onClick={handleLogout}
+            sx={{
+              color: "#9ca3af",
+              "&:hover": {
+                color: "#dc2626",
+                bgcolor: "#fee2e2"
+              }
+            }}
+          >
+            <Logout />
+          </IconButton>
         </Box>
       </Box>
     </Box>

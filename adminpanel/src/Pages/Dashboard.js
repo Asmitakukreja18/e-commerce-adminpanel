@@ -28,9 +28,10 @@ import {
   Inventory2,
   WarningAmber
 } from "@mui/icons-material";
-
-
-
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchOrders } from "../Store/OrderSlice";
+import { fetchProducts } from "../Store/ProductSlice";
 
 const salesData = [
   { name: "Mon", value: 400 },
@@ -51,8 +52,47 @@ const categoryData = [
 
 const COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#a855f7"];
 
+const getStatusColor = (status) => {
+  switch (status) {
+    case "Delivered":
+      return { bg: "#DCFCE7", text: "#16A34A" };
+    case "Processing":
+      return { bg: "#DBEAFE", text: "#2563EB" };
+    case "Pending":
+      return { bg: "#FEF9C3", text: "#CA8A04" };
+    case "Cancelled":
+      return { bg: "#FEE2E2", text: "#DC2626" };
+    default:
+      return { bg: "#F3F4F6", text: "#374151" };
+  }
+};
 
 export default function Dashboard() {
+  const dispatch = useDispatch();
+  const { orders } = useSelector((state) => state.orders);
+  const { products } = useSelector((state) => state.products);
+
+  useEffect(() => {
+    dispatch(fetchOrders());
+    dispatch(fetchProducts());
+  }, [dispatch]);
+
+ 
+  const totalOrders = orders.length;
+  const totalSales = orders.reduce((acc, order) => acc + (order.totalAmount || 0), 0);
+  const totalProducts = products.length;
+  
+
+  const lowStockCount = products.reduce((acc, product) => {
+    const lowStockVariants = product.variants.filter(v => v.stock <= 10).length;
+    return acc + lowStockVariants;
+  }, 0);
+
+  const activeProducts = products.filter(p => p.isActive !== false).length; // Assuming isActive field exists or default true
+
+
+  const recentOrders = orders.slice(0, 5);
+
   return (
     <Box sx={{ p: 3 }}>
       <Grid container spacing={4} mb={7}>
@@ -61,7 +101,7 @@ export default function Dashboard() {
           bg="#dbeafe"
           color="#2563eb"
           label="Total Orders"
-          value="1,248"
+          value={totalOrders}
           badge="+12.5%"
           badgeColor="success"
         />
@@ -70,7 +110,7 @@ export default function Dashboard() {
           bg="#dcfce7"
           color="#16a34a"
           label="Total Sales"
-          value="₹3.2L"
+          value={`₹${totalSales.toLocaleString()}`}
           badge="+8.2%"
           badgeColor="success"
         />
@@ -79,8 +119,8 @@ export default function Dashboard() {
           bg="#f3e8ff"
           color="#9333ea"
           label="Total Products"
-          value="287"
-          badge="245 Active"
+          value={totalProducts}
+          badge={`${activeProducts} Active`}
           badgeColor="default"
         />
         <StatCard
@@ -88,7 +128,7 @@ export default function Dashboard() {
           bg="#fee2e2"
           color="#dc2626"
           label="Low Stock Items"
-          value="23"
+          value={lowStockCount}
           badge="Urgent"
           badgeColor="error"
         />
@@ -180,19 +220,21 @@ export default function Dashboard() {
           </TableHead>
 
           <TableBody>
-            {orders.map((o) => (
-              <TableRow hover key={o.id}>
-                <TableCell fontWeight={600}>{o.id}</TableCell>
-                <TableCell>{o.customer}</TableCell>
-                <TableCell>{o.date}</TableCell>
-                <TableCell fontWeight={600}>{o.amount}</TableCell>
+            {recentOrders.map((o) => {
+               const { bg, text } = getStatusColor(o.status);
+               return (
+              <TableRow hover key={o._id}>
+                <TableCell fontWeight={600}>#{o._id.slice(-6).toUpperCase()}</TableCell>
+                <TableCell>{o.customer.name}</TableCell>
+                <TableCell>{new Date(o.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell fontWeight={600}>₹{o.totalAmount}</TableCell>
                 <TableCell>
                   <Chip
                     label={o.status}
                     size="small"
                     sx={{
-                      bgcolor: o.bg,
-                      color: o.color,
+                      bgcolor: bg,
+                      color: text,
                       fontWeight: 600
                     }}
                   />
@@ -203,7 +245,12 @@ export default function Dashboard() {
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
+            {recentOrders.length === 0 && (
+               <TableRow>
+                 <TableCell colSpan={6} align="center">No recent orders</TableCell>
+               </TableRow>
+            )}
           </TableBody>
         </Table>
       </Card>

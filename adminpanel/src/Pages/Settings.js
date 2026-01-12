@@ -5,7 +5,8 @@ import {
   Typography,
   TextField,
   Button,
-  Stack
+  Stack,
+  Alert
 } from "@mui/material";
 
 import {
@@ -15,8 +16,55 @@ import {
   Logout,
   ChevronRight
 } from "@mui/icons-material";
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { updateProfile, logout } from "../Store/AuthSlice";
+import { useNavigate } from "react-router-dom";
 
 export default function Settings() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { admin, loading, error } = useSelector((state) => state.auth);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    newPassword: ""
+  });
+
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    if (admin) {
+      setFormData(prev => ({
+        ...prev,
+        name: admin.name || "",
+        email: admin.email || ""
+      }));
+    }
+  }, [admin]);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async () => {
+    setMessage(null);
+    const result = await dispatch(updateProfile(formData));
+    if (updateProfile.fulfilled.match(result)) {
+      setMessage({ type: "success", text: "Profile updated successfully!" });
+      setFormData(prev => ({ ...prev, password: "", newPassword: "" }));
+    } else {
+      setMessage({ type: "error", text: result.payload || "Failed to update profile" });
+    }
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate("/login", { replace: true });
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", p: 3 }}>
    
@@ -28,6 +76,12 @@ export default function Settings() {
           Manage your business profile and preferences
         </Typography>
       </Box>
+
+      {message && (
+        <Alert severity={message.type} sx={{ mb: 3 }}>
+          {message.text}
+        </Alert>
+      )}
 
       <Grid container spacing={4}>
         <Grid item xs={12} lg={8}width={800}>
@@ -75,26 +129,46 @@ export default function Settings() {
               <Stack spacing={3}>
                 <Box>
                   <Label>Full Name</Label>
-                  <Input defaultValue="Admin User" />
+                  <Input 
+                    name="name" 
+                    value={formData.name} 
+                    onChange={handleChange} 
+                  />
                 </Box>
 
                 <Box>
                   <Label>Email Address</Label>
-                  <Input defaultValue="admin@smartgrocery.com" />
+                  <Input 
+                    name="email" 
+                    value={formData.email} 
+                    onChange={handleChange} 
+                  />
                 </Box>
 
                 <Box>
-                  <Label>Current Password</Label>
-                  <Input type="password" />
+                  <Label>Current Password (Required to set new password)</Label>
+                  <Input 
+                    name="password" 
+                    type="password" 
+                    value={formData.password} 
+                    onChange={handleChange} 
+                  />
                 </Box>
 
                 <Box>
                   <Label>New Password</Label>
-                  <Input type="password" />
+                  <Input 
+                    name="newPassword" 
+                    type="password" 
+                    value={formData.newPassword} 
+                    onChange={handleChange} 
+                  />
                 </Box>
               </Stack>
 
-              <Button sx={primaryBtn}>Update Profile</Button>
+              <Button sx={primaryBtn} onClick={handleSubmit} disabled={loading}>
+                {loading ? "Updating..." : "Update Profile"}
+              </Button>
             </Paper>
           </Stack>
         </Grid>
@@ -123,12 +197,12 @@ export default function Settings() {
                   color="#16A34A"
                   bg="#DCFCE7"
                 />
-              <ActionRow
-      icon={<Logout />}
-      label="Logout"
-      danger
-      to="/login"
-    />
+                <ActionRow
+                  icon={<Logout />}
+                  label="Logout"
+                  danger
+                  onClick={handleLogout}
+                />
               </Stack>
             </Paper>
 
@@ -216,8 +290,9 @@ const Label = ({ children }) => (
   </Typography>
 );
 
-const ActionRow = ({ icon, label, color, bg, danger }) => (
+const ActionRow = ({ icon, label, color, bg, danger, onClick }) => (
   <Box
+    onClick={onClick}
     sx={{
       display: "flex",
       alignItems: "center",

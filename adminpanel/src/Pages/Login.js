@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -12,13 +13,27 @@ import ShoppingBasketIcon from "@mui/icons-material/ShoppingBasket";
 import EmailIcon from "@mui/icons-material/Email";
 import LockIcon from "@mui/icons-material/Lock";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { adminLogin } from "../Store/AuthSlice";
+
 export default function Login() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
 
-const onLogin = () => {
- 
-  navigate("/");
-};
+  const { token, loading, error } = useSelector((state) => state.auth);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const onLogin = () => {
+    dispatch(adminLogin({ email, password }));
+  };
+
+useEffect(() => {
+  if (token) {
+    navigate("/", { replace: true });
+  }
+}, [token, navigate]);
   return (
     <Box
       sx={{
@@ -65,11 +80,14 @@ const onLogin = () => {
           </Typography>
         </Box>
 
-        <Box component="form" display="flex" flexDirection="column" gap={3}>
+        <Box display="flex" flexDirection="column" gap={3}>
           <Box>
             <Label>Email Address</Label>
             <TextField
               fullWidth
+              variant="outlined"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@smartgrocery.com"
               InputProps={{
                 startAdornment: (
@@ -85,6 +103,8 @@ const onLogin = () => {
             <TextField
               fullWidth
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               InputProps={{
                 startAdornment: (
@@ -117,7 +137,6 @@ const onLogin = () => {
             />
 
             <Link
-              href="#"
               underline="none"
               fontSize={14}
               fontWeight={600}
@@ -127,34 +146,45 @@ const onLogin = () => {
             </Link>
           </Box>
 
-         <Button
-  fullWidth
-  onClick={onLogin}
-  sx={{
-    mt: 1,
-    bgcolor: "#16A34A",
-    color: "#fff",
-    py: 1.5,
-    borderRadius: 3,
-    fontWeight: 600,
-    fontSize: 16,
-    textTransform: "none",
-    boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
-    "&:hover": { bgcolor: "#15803D" }
-  }}
->
-  Sign In
-</Button>
+          {error && (
+            <Typography color="error" fontSize={13} textAlign="center">
+              {error}
+            </Typography>
+          )}
 
+          <Button
+            fullWidth
+            disabled={loading}
+            onClick={onLogin}
+            sx={{
+              mt: 1,
+              bgcolor: "#16A34A",
+              color: "#fff",
+              py: 1.5,
+              borderRadius: 3,
+              fontWeight: 600,
+              fontSize: 16,
+              textTransform: "none",
+              boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
+              "&:hover": { bgcolor: "#15803D" }
+            }}
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
         </Box>
       </Paper>
     </Box>
   );
 }
 
-
 const Label = ({ children }) => (
-  <Typography fontSize={13} fontWeight={600} mb={1} color="#374151">
+  <Typography
+    component="label"
+    fontSize={13}
+    fontWeight={600}
+    mb={1}
+    color="#374151"
+  >
     {children}
   </Typography>
 );
